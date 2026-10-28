@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="320" height="64" viewBox="0 0 320 64" fill="none">
+  <title>RWAHub Logo</title>
+  <rect width="320" height="64" fill="none"/>
+  <g font-family="Arial, Helvetica, sans-serif" font-size="46" font-weight="800" letter-spacing="-2.5">
+    <text x="4" y="48" fill="#0B1729">RW</text>
+    <text x="77" y="48" fill="#0B1729">A</text>
+    <path d="M101 35 L109 49 L93 49 Z" fill="#1677FF"/>
+    <text x="126" y="48" fill="#1677FF">Hub</text>
+  </g>
+</svg>

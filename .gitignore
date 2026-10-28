@@ -1,0 +1,38 @@
+# Logs
+logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+
+# Local secrets — keep example.env, never commit .env
+.env.local
+.env.*.local
+
+package-lock.json
+node_modules
+uploads
+dist
+artifacts
+cache
+dist-ssr
+*.local
+
+# Editor directories and files
+.vscode/*
+!.vscode/extensions.json
+.idea
+.DS_Store
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+
+# Local credentials and generated content
+.env
+.env.*
+*.pem
+*.key
