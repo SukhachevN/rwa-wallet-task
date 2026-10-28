@@ -34,7 +34,7 @@ const PageLoader = () => (
 
 function RequireAuth() {
   const isAuthenticated = useAuthStore((state) => state.isAuthenticated);
-  const openAuthModal = useAuthStore((state) => state.openAuthModal);
+  const walletSessionChecked = useAuthStore((state) => state.walletSessionChecked);
   const [hydrated, setHydrated] = useState(() => useAuthStore.persist.hasHydrated());
 
   useEffect(() => {
@@ -44,13 +44,7 @@ function RequireAuth() {
     return useAuthStore.persist.onFinishHydration(() => setHydrated(true));
   }, []);
 
-  useEffect(() => {
-    if (hydrated && !isAuthenticated) {
-      openAuthModal();
-    }
-  }, [hydrated, isAuthenticated, openAuthModal]);
-
-  if (!hydrated) {
+  if (!hydrated || !walletSessionChecked) {
     return <PageLoader />;
   }
 
@@ -67,9 +61,58 @@ function GlobalAuthModal() {
   return <AuthModal isOpen={authModalOpen} onClose={closeAuthModal} />;
 }
 
+function WalletChainSync() {
+  const address = useAuthStore((state) => state.user?.wallet?.address);
+  const refreshWalletChain = useAuthStore((state) => state.refreshWalletChain);
+  const ensureWalletListeners = useAuthStore((state) => state.ensureWalletListeners);
+
+  useEffect(() => {
+    if (!address) {
+      return;
+    }
+    const pull = () => {
+      ensureWalletListeners();
+      void refreshWalletChain();
+    };
+    pull();
+    const timer = window.setInterval(pull, 1000);
+    window.addEventListener('focus', pull);
+    document.addEventListener('visibilitychange', pull);
+    return () => {
+      window.clearInterval(timer);
+      window.removeEventListener('focus', pull);
+      document.removeEventListener('visibilitychange', pull);
+    };
+  }, [address, refreshWalletChain, ensureWalletListeners]);
+
+  return null;
+}
+
+function WalletSessionLifecycle() {
+  const reconcilePersistedSession = useAuthStore((state) => state.reconcilePersistedSession);
+  const releaseWalletBindings = useAuthStore((state) => state.releaseWalletBindings);
+
+  useEffect(() => {
+    const run = () => {
+      void reconcilePersistedSession();
+    };
+    if (useAuthStore.persist.hasHydrated()) {
+      run();
+    }
+    const unsubscribe = useAuthStore.persist.onFinishHydration(run);
+    return () => {
+      unsubscribe();
+      releaseWalletBindings();
+    };
+  }, [reconcilePersistedSession, releaseWalletBindings]);
+
+  return null;
+}
+
 function RedirectAfterAuth() {
   const navigate = useNavigate();
   const isAuthenticated = useAuthStore((state) => state.isAuthenticated);
+  const walletSessionChecked = useAuthStore((state) => state.walletSessionChecked);
   const [hydrated, setHydrated] = useState(() => useAuthStore.persist.hasHydrated());
   const wasAuthenticated = useRef<boolean | null>(null);
 
@@ -81,7 +124,7 @@ function RedirectAfterAuth() {
   }, []);
 
   useEffect(() => {
-    if (!hydrated) {
+    if (!hydrated || !walletSessionChecked) {
       return;
     }
     if (wasAuthenticated.current === null) {
@@ -92,7 +135,7 @@ function RedirectAfterAuth() {
       navigate('/dashboard', { replace: true });
     }
     wasAuthenticated.current = isAuthenticated;
-  }, [hydrated, isAuthenticated, navigate]);
+  }, [hydrated, walletSessionChecked, isAuthenticated, navigate]);
 
   return null;
 }
@@ -115,6 +158,8 @@ function App() {
   return (
     <Router>
       <BootstrapApiData />
+      <WalletSessionLifecycle />
+      <WalletChainSync />
       <RedirectAfterAuth />
       <GlobalAuthModal />
       <Toaster position="top-right" />

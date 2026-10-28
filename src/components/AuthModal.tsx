@@ -1,8 +1,8 @@
 import React, { useEffect, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { X, Wallet } from 'lucide-react';
+import { X, Wallet, Loader } from 'lucide-react';
 import { Button } from './ui/Button';
-import { useAuthStore } from '@/store/authStore';
+import { describeChain, useAuthStore } from '@/store/authStore';
 import { AnimatedLogo } from './AnimatedLogo';
 import { useNavigate } from 'react-router-dom';
 
@@ -12,8 +12,19 @@ interface AuthModalProps {
 }
 
 export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose }) => {
-  const { connectWallet, loading, error, clearError, isAuthenticated } = useAuthStore();
+  const {
+    connectWallet,
+    error,
+    clearError,
+    isAuthenticated,
+    walletStatus,
+    switchingNetwork,
+    user,
+    switchToPharos,
+  } = useAuthStore();
   const navigate = useNavigate();
+  const address = user?.wallet?.address;
+  const isConnecting = walletStatus === 'connecting';
 
   const goToDashboard = useCallback(() => {
     onClose();
@@ -22,10 +33,10 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose }) => {
   }, [navigate, onClose]);
 
   useEffect(() => {
-    if (isOpen && isAuthenticated) {
+    if (isOpen && isAuthenticated && walletStatus === 'connected') {
       goToDashboard();
     }
-  }, [isOpen, isAuthenticated, goToDashboard]);
+  }, [isOpen, isAuthenticated, walletStatus, goToDashboard]);
 
   // Handle escape key press
   const handleEscapeKey = useCallback(
@@ -51,9 +62,25 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose }) => {
 
   // Handle Web3 wallet connection
   const handleWeb3Connect = async () => {
+    if (useAuthStore.getState().walletStatus === 'connecting') {
+      return;
+    }
     clearError();
     const ok = await connectWallet();
-    if (ok || useAuthStore.getState().isAuthenticated) {
+    if (ok && useAuthStore.getState().walletStatus === 'connected') {
+      goToDashboard();
+    }
+  };
+
+  const handleSwitchNetwork = async () => {
+    if (
+      useAuthStore.getState().walletStatus === 'connecting' ||
+      useAuthStore.getState().switchingNetwork
+    ) {
+      return;
+    }
+    const ok = await switchToPharos();
+    if (ok && useAuthStore.getState().walletStatus === 'connected') {
       goToDashboard();
     }
   };
@@ -116,33 +143,61 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose }) => {
                   </div>
 
                   {/* Form Content */}
-                  <div className="mt-8 space-y-5">
+                  <div className="mt-8 space-y-5" aria-live="polite">
                     <Button
                       fullWidth
-                      disabled={loading}
-                      icon={<Wallet size={16} />}
+                      disabled={isConnecting}
+                      icon={
+                        isConnecting ? (
+                          <Loader size={16} className="animate-spin" />
+                        ) : (
+                          <Wallet size={16} />
+                        )
+                      }
                       iconPosition="left"
                       onClick={handleWeb3Connect}
                       className="bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 text-white"
                     >
-                      {loading ? 'Connecting...' : 'Continue with Wallet'}
+                      {isConnecting ? 'Connecting...' : 'Continue with Wallet'}
                     </Button>
+                    {address && (
+                      <p className="text-sm text-neutral-600 break-all">
+                        <span className="block text-neutral-500">Wallet address</span>
+                        <span className="font-mono text-neutral-900">{address}</span>
+                        <span className="mt-1 block text-neutral-700">{describeChain(user?.wallet?.chainId)}</span>
+                      </p>
+                    )}
+                    {isConnecting && (
+                      <p className="text-sm text-neutral-600 flex items-center gap-2">
+                        <Loader size={16} className="animate-spin" />
+                        Waiting for the wallet...
+                      </p>
+                    )}
                     {error && (
                       <div
-                        className="bg-red-50 border border-red-200 text-red-600 p-3 rounded-lg text-sm flex items-center justify-between"
+                        className="bg-red-50 border border-red-200 text-red-600 p-3 rounded-lg text-sm flex items-center justify-between gap-3"
                         role="alert"
                       >
                         <span>{error}</span>
-                        <button
-                          type="button"
-                          onClick={() => {
-                            clearError();
-                            handleWeb3Connect();
-                          }}
-                          className="text-red-600 hover:text-red-800 font-medium"
-                        >
-                          Retry
-                        </button>
+                        {walletStatus === 'wrong_network' ? (
+                          <button
+                            type="button"
+                            onClick={handleSwitchNetwork}
+                            disabled={switchingNetwork}
+                            className="shrink-0 text-red-600 hover:text-red-800 font-medium disabled:opacity-50"
+                          >
+                            {switchingNetwork ? 'Waiting for wallet...' : 'Switch network'}
+                          </button>
+                        ) : (
+                          <button
+                            type="button"
+                            onClick={handleWeb3Connect}
+                            disabled={isConnecting}
+                            className="shrink-0 text-red-600 hover:text-red-800 font-medium disabled:opacity-50"
+                          >
+                            Retry
+                          </button>
+                        )}
                       </div>
                     )}
                   </div>

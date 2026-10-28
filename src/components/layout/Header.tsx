@@ -5,6 +5,8 @@ import { Button } from '../ui/Button';
 import { motion, AnimatePresence } from 'framer-motion';
 import { AnimatedLogo } from '../AnimatedLogo';
 import { useAuthStore } from '@/store/authStore';
+import { truncateAddress } from '@/utils/formatters';
+import { describeChain } from '@/store/authStore';
 
 // Assuming AnimatedLogoProps is defined elsewhere and includes className
 interface AnimatedLogoProps {
@@ -17,7 +19,8 @@ export const Header = () => {
   const [isLoggingOut, setIsLoggingOut] = useState(false);
   const location = useLocation();
   const navigate = useNavigate();
-  const { isAuthenticated, logout, openAuthModal } = useAuthStore();
+  const { isAuthenticated, logout, openAuthModal, user, walletStatus, disconnectWallet } = useAuthStore();
+  const walletAddress = user?.wallet?.address;
 
   useEffect(() => {
     const handleScroll = () => {
@@ -56,14 +59,70 @@ export const Header = () => {
     }
   };
 
+  const handleDisconnect = async () => {
+    try {
+      setIsLoggingOut(true);
+      await disconnectWallet();
+      navigate('/');
+    } catch (error) {
+      console.error('Disconnect failed:', error);
+    } finally {
+      setIsLoggingOut(false);
+    }
+  };
+
   const renderAuthButton = () => {
+    if (walletStatus === 'connecting') {
+      return (
+        <Button disabled className="flex items-center gap-2">
+          Connecting...
+        </Button>
+      );
+    }
+
+    if (walletAddress && (walletStatus === 'connected' || walletStatus === 'wrong_network')) {
+      return (
+        <div className="flex items-center gap-4">
+          {isAuthenticated && (
+            <Link to="/dashboard" className="text-sm text-neutral-600 hover:text-blue-600">
+              Dashboard
+            </Link>
+          )}
+          <span className="text-sm font-mono text-neutral-700" title={walletAddress}>
+            <span className="sr-only">{walletAddress}</span>
+            <span aria-hidden="true">{truncateAddress(walletAddress)}</span>
+          </span>
+          <span className={`text-xs ${walletStatus === 'wrong_network' ? 'text-amber-700' : 'text-neutral-500'}`}>
+            {describeChain(user?.wallet?.chainId)}
+          </span>
+          {walletStatus === 'wrong_network' && (
+            <button
+              type="button"
+              onClick={handleOpenAuthModal}
+              className="text-xs font-medium text-amber-700 hover:text-amber-800"
+            >
+              Wrong network
+            </button>
+          )}
+          <span title="Disconnects this app only. Wallet permissions stay unchanged.">
+            <Button
+              variant="outline"
+              onClick={handleDisconnect}
+              disabled={isLoggingOut}
+              className="flex items-center gap-2"
+            >
+              <LogOut size={16} />
+              {isLoggingOut ? 'Disconnecting...' : 'Disconnect'}
+            </Button>
+          </span>
+        </div>
+      );
+    }
+
     if (isAuthenticated) {
       return (
         <div className="flex items-center gap-4">
-          <Link
-            to="/dashboard"
-            className="text-sm text-neutral-600 hover:text-blue-600"
-          >
+          <Link to="/dashboard" className="text-sm text-neutral-600 hover:text-blue-600">
             Dashboard
           </Link>
           <Button

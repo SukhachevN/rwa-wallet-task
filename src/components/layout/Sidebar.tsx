@@ -13,7 +13,8 @@ interface SidebarProps {
 export const Sidebar: React.FC<SidebarProps> = ({ isCollapsed, toggleSidebar }) => {
   const location = useLocation();
   const navigate = useNavigate();
-  const { logout, loading, error, isAuthenticated } = useAuthStore();
+  const { logout, loading, error, isAuthenticated, user } = useAuthStore();
+  const canSignOut = isAuthenticated || Boolean(user?.wallet?.address);
   const [logoutError, setLogoutError] = useState<string | null>(null);
 
   const navItems = [
@@ -98,7 +99,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ isCollapsed, toggleSidebar }) 
       </div>
 
       {/* Navigation */}
-      <nav className="flex-1 py-6 px-3">
+      <nav className="flex-1 overflow-y-auto py-6 px-3">
         <ul className="space-y-2">
           {navItems.map((item) => (
             <motion.li
@@ -134,8 +135,8 @@ export const Sidebar: React.FC<SidebarProps> = ({ isCollapsed, toggleSidebar }) 
       </nav>
 
       {/* Logout */}
-      {isAuthenticated && (
-        <div className="p-3 border-t border-gray-200">
+      {canSignOut && (
+        <div className="p-3 border-t border-gray-200 shrink-0">
           {logoutError && (
             <div className="mb-2 px-4 py-2 bg-red-50 border border-red-200 text-red-600 text-xs rounded-md">
               {logoutError}

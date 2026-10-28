@@ -1,10 +1,11 @@
 import React, { useEffect, useMemo, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { Package, DollarSign, Clock, AlertCircle, Search, Filter } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import { useMockDataStore } from '@/store/mockDataStore';
 import { formatCurrency } from '@/utils/format';
-import { useAuthStore } from '@/store/authStore';
+import { describeChain, getExpectedNetwork, useAuthStore } from '@/store/authStore';
 import { isOnChainConfigured } from '@/utils/onchain';
 import { dashboardApi, DashboardStats } from '@/api/dashboard';
 
@@ -48,12 +49,20 @@ export default function DashboardPage() {
       .then((data) => setDashboardStats(data.stats))
       .catch(() => setDashboardStats(null));
   }, [searchQuery, filterType]);
+  const navigate = useNavigate();
   const user = useAuthStore((state) => state.user);
   const switchToPharos = useAuthStore((state) => state.switchToPharos);
+  const switchingNetwork = useAuthStore((state) => state.switchingNetwork);
+  const disconnectWallet = useAuthStore((state) => state.disconnectWallet);
+  const ensureWalletListeners = useAuthStore((state) => state.ensureWalletListeners);
+  const walletError = useAuthStore((state) => state.error);
   const wallet = user?.wallet;
-  const onPharos = wallet?.chainId === 50002;
-  const onHardhat = wallet?.chainId === 31337;
-  const chainReady = onPharos || onHardhat;
+
+  useEffect(() => {
+    ensureWalletListeners();
+  }, [ensureWalletListeners]);
+  const expectedNetwork = getExpectedNetwork();
+  const chainReady = wallet?.chainId === expectedNetwork.chainId;
   const onChainLive = isOnChainConfigured();
   const walletLabel = wallet?.address
     ? `${wallet.address.slice(0, 6)}...${wallet.address.slice(-4)}`
@@ -135,21 +144,44 @@ export default function DashboardPage() {
         </div>
         <div className="text-right">
           <p className="text-sm text-gray-500">Wallet</p>
-          <p className="font-medium text-gray-900">{walletLabel}</p>
-          <p className={`text-xs mt-1 ${chainReady ? 'text-green-600' : 'text-amber-600'}`}>
-            {onHardhat ? 'Hardhat Local' : onPharos ? 'Pharos Devnet' : wallet?.chainId ? `Chain ${wallet.chainId}` : 'Network unknown'}
+          <p className="font-medium text-gray-900" title={wallet?.address || undefined}>
+            {walletLabel}
           </p>
+          {wallet?.address ? (
+            <p className="text-xs text-gray-500 break-all font-mono">{wallet.address}</p>
+          ) : null}
+          <p className={`text-xs mt-1 ${chainReady ? 'text-green-600' : 'text-amber-600'}`}>
+            {describeChain(wallet?.chainId)}
+          </p>
+          {!chainReady && walletError ? (
+            <p className="text-xs text-amber-700 mt-1 max-w-xs ml-auto">{walletError}</p>
+          ) : null}
           <p className="text-xs text-gray-500 mt-1">
             {onChainLive ? 'On-chain contracts configured' : 'Local demo only'}
           </p>
-          {!chainReady && wallet?.isConnected ? (
-            <Button
-              variant="outline"
-              className="mt-2"
-              onClick={() => switchToPharos()}
-            >
-              Switch network
-            </Button>
+          {wallet?.isConnected ? (
+            <div className="mt-2 flex justify-end gap-2">
+              {!chainReady ? (
+                <Button
+                  variant="outline"
+                  disabled={switchingNetwork}
+                  onClick={() => {
+                    void switchToPharos();
+                  }}
+                >
+                  {switchingNetwork ? 'Waiting for wallet...' : 'Switch network'}
+                </Button>
+              ) : null}
+              <Button
+                variant="outline"
+                onClick={async () => {
+                  await disconnectWallet();
+                  navigate('/');
+                }}
+              >
+                Disconnect
+              </Button>
+            </div>
           ) : null}
         </div>
       </div>
